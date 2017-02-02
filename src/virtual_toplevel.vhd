@@ -195,9 +195,6 @@ signal TG68_ENAWRREG	: std_logic;
 
 signal TG68_ENA: std_logic;
 signal TG68_ENA_DIV: std_logic_vector(1 downto 0);
-signal TG68_ENA_WR: std_logic;
-signal TG68_ENA_RD: std_logic;
-signal TG68_ENA_INT: std_logic;
 signal TG68_WR: std_logic;
 signal TG68_RD: std_logic;
 signal TG68_IO: std_logic;
@@ -538,10 +535,24 @@ process(MRST_N, MCLK)
 begin
 	if MRST_N = '0' then
 		TG68_ENA_DIV <= "00";
+		TG68_AS_N <= '1';
 	elsif rising_edge( MCLK ) then
-		if TG68_ENARDREG = '1' then
+		if TG68_ENAWRREG = '1' then
 			TG68_ENA_DIV <= TG68_ENA_DIV + 1;
-		end if;	
+
+			-- activate AS
+			if TG68_IO = '1' and TG68_ENA_DIV = "00" then
+				TG68_AS_N <= '0';
+			end if;
+			
+		end if;
+
+		if TG68_ENARDREG = '1' then
+			-- de-activate as in bus cycle 3 if dtack is ok
+			if TG68_ENA_DIV = "11" and TG68_DTACK_N = '0' then
+				TG68_AS_N <= '1';
+			end if;
+		end if;		
 	end if;
 end process;
 	
@@ -549,18 +560,8 @@ TG68_WR <= '1' when TG68_STATE = "11" else '0';      -- data wr
 TG68_RD <= '1' when TG68_STATE = "00" or TG68_STATE = "10" else '0';   -- inst or data rd
 TG68_IO <= '1' when TG68_WR = '1' or TG68_RD = '1' else '0';
 
--- tg68k memory write cycle
-TG68_ENA_WR <= '1' when TG68_CLKE = '1' and TG68_WR = '1' and TG68_ENAWRREG = '1' and TG68_DTACK_N = '0' else '0';
--- tg68k me memory read cycke (inst fetch or op read)
-TG68_ENA_RD <= '1' when TG68_CLKE = '1' and TG68_RD = '1' and TG68_ENARDREG = '1' and TG68_DTACK_N = '0' else '0';
--- tg68k internal cycle
-TG68_ENA_INT <= '1' when TG68_CLKE = '1' and TG68_RD = '0' and TG68_WR = '0' else '0';
-
 -- clock enable signal for tg68k. Effectively clock/16 -> 3.375 MHz
 TG68_ENA <= '1' when TG68_ENARDREG = '1' and TG68_ENA_DIV = "11" and TG68_DTACK_N = '0' else '0';
-
--- address strobe is not valid in first quarter of memory cycle
-TG68_AS_N <= '0' when TG68_IO = '1' and TG68_ENA_DIV /= "00" else '1';
 
 TG68_INTACK <= '1' when TG68_ENA = '1' and TG68_FC = "111" else '0';
 
