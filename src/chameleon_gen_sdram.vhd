@@ -151,6 +151,9 @@ entity chameleon_sdram is
 		vram_q : out unsigned(15 downto 0);
 		vram_u_n : in std_logic;
 		vram_l_n : in std_logic;
+		-- 64 bit vram interface
+		vram_ack64 : out std_logic;
+		vram_q64 : out unsigned(63 downto 0);
 		
 --GE Temporary
 		initDone : out std_logic;
@@ -219,6 +222,7 @@ architecture rtl of chameleon_sdram is
 	signal ramState : ramStates := RAM_INIT;
 	signal ramAlmostDone : std_logic;
 	signal ramDone : std_logic;
+	signal burstDone : std_logic;
 	
 	signal ram_data_reg : unsigned(sd_data'range);
 
@@ -255,6 +259,7 @@ architecture rtl of chameleon_sdram is
 	signal romrd_ackReg : std_logic := '0';
 	signal ram68k_ackReg : std_logic := '0';
 	signal vram_ackReg : std_logic := '0';
+	signal vram_ack64Reg : std_logic := '0';
 	
 --GE
 	signal cpu6510_qReg : unsigned(7 downto 0);
@@ -499,6 +504,7 @@ begin
 			refreshSubtract <= '0';
 			ramAlmostDone <= '0';
 			ramDone <= '0';
+			burstDone <= '0';
 			sd_data_ena <= '0';
 			sd_addr_reg <= (others => '0');
 			sd_ras_n_reg <= '1';
@@ -685,6 +691,7 @@ begin
 				when RAM_READ_5 =>
 					currentRdData(63 downto 48) <= ram_data_reg;
 					ramState <= RAM_IDLE;
+					burstDone <= '1';
 -- /!\
 					case currentPort is
 					when PORT_CPU6510 | PORT_REU | PORT_CPU_1541 
@@ -958,6 +965,19 @@ begin
 	end process;
 	ram68k_ack <= ram68k_ackReg;
 	ram68k_q <= ram68k_qReg; --GE
+
+	-- TH
+	process(clk)
+	begin
+		if rising_edge(clk) then
+			if currentPort = PORT_VRAM
+			and burstDone = '1' then
+				vram_ack64Reg <= not vram_ack64Reg;
+				vram_q64 <= currentRdData;
+			end if;
+		end if;
+	end process;
+	vram_ack64 <= vram_ack64Reg;
 
 	process(clk)
 	begin

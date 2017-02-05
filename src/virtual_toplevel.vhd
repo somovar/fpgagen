@@ -135,6 +135,8 @@ signal vram_d : std_logic_vector(15 downto 0);
 signal vram_q : std_logic_vector(15 downto 0);
 signal vram_l_n : std_logic;
 signal vram_u_n : std_logic;
+signal vram_q64 : std_logic_vector(63 downto 0);
+signal vram_ack64 : std_logic;
 
 
 type sdrc_t is ( SDRC_IDLE,
@@ -505,6 +507,8 @@ sdc : entity work.sdram_controller generic map (
 	vram_q	=> vram_q,
 	vram_u_n => vram_u_n,
 	vram_l_n => vram_l_n,
+	vram_q64	=> vram_q64,
+	vram_ack64 => vram_ack64,
 	
 	initDone 	=> SDR_INIT_DONE
 );
