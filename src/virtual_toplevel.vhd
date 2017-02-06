@@ -678,10 +678,12 @@ port map(
 
 	vram_req => vram_req,
 	vram_ack => vram_ack,
+	vram_ack64 => vram_ack64,
 	vram_we	=> vram_we,
 	vram_a	=> vram_a,
 	vram_d	=> vram_d,
 	vram_q	=> vram_q,
+	vram_q64	=> vram_q64,
 	vram_u_n	=> vram_u_n,
 	vram_l_n	=> vram_l_n,
 	

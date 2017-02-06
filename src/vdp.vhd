@@ -57,10 +57,12 @@ entity vdp is
 
 		vram_req : out std_logic;
 		vram_ack : in std_logic;
+		vram_ack64 : in std_logic;
 		vram_we : out std_logic;
 		vram_a : out std_logic_vector(14 downto 0);
 		vram_d : out std_logic_vector(15 downto 0);
 		vram_q : in std_logic_vector(15 downto 0);
+		vram_q64 : in std_logic_vector(63 downto 0);
 		vram_u_n : out std_logic;
 		vram_l_n : out std_logic;
 		
@@ -98,6 +100,29 @@ end vdp;
 
 architecture rtl of vdp is
 
+-- signals keeping the transfer type after vram_ack so the vdp knows
+-- the source of the entire 64 bit burst result which comes a little
+-- later
+signal vram_sel64_sp1 : std_logic;
+signal vram_q64_sp1 : std_logic_vector(63 downto 0);
+signal vram_a64_sp1 : std_logic_vector(14 downto 0);
+signal vram_sel64_sp2 : std_logic;
+signal vram_q64_sp2 : std_logic_vector(63 downto 0);
+signal vram_a64_sp2 : std_logic_vector(14 downto 0);
+signal vram_sel64_bga : std_logic;
+signal vram_sel64_bgb : std_logic;
+signal vram_ack64_D : std_logic;
+
+attribute keep : boolean;
+attribute noprune: boolean;
+attribute noprune of vram_q64_sp1 : signal is true;
+attribute noprune of vram_a64_sp1 : signal is true;
+attribute noprune of vram_q64_sp2 : signal is true;
+attribute noprune of vram_a64_sp2 : signal is true;
+attribute keep of vram_q64_sp1 : signal is true;
+attribute keep of vram_a64_sp1 : signal is true;
+attribute keep of vram_q64_sp2 : signal is true;
+attribute keep of vram_a64_sp2 : signal is true;
 
 signal vram_req_reg : std_logic;
 signal vram_we_reg : std_logic;
@@ -584,6 +609,74 @@ signal PIXOUT		: std_logic;
 
 begin
 
+----------------------------------------------------------------
+-- 64 bit burst interface
+---------------------------------------------------------------
+
+-- xyz
+process( RST_N, CLK )
+begin
+	if RST_N = '0' then
+		vram_sel64_bgb <= '0';
+		vram_sel64_bga <= '0';
+		vram_sel64_sp1 <= '0';
+		vram_sel64_sp2 <= '0';
+		vram_ack64_D <= '0';
+		
+		-- vram_q64_sp1 : std_logic_vector(63 downto 0);
+		-- vram_q64_sp2 : std_logic_vector(63 downto 0);
+	elsif rising_edge(CLK) then
+		-- store 64 bit result according to the engine that requested
+		-- the transfer
+	
+		if vram_ack64_D /= vram_ack64 then
+		
+			if vram_sel64_sp1 = '1' then
+				vram_q64_sp1 <= vram_q64;
+				vram_sel64_sp1 <= '0';
+			end if;
+			
+			if vram_sel64_sp2 = '1' then
+				vram_q64_sp2 <= vram_q64;
+				vram_sel64_sp2 <= '0';
+			end if;
+		
+			vram_ack64_D <= not vram_ack64_D;
+		end if;
+		
+		case VMC is
+		when VMC_BGB_RD1 =>		-- BACKGROUND B
+			if vram_req_reg = vram_ack then
+				vram_sel64_bgb <= '1';
+			end if;
+			
+		when VMC_BGA_RD1 =>		-- BACKGROUND A
+			if vram_req_reg = vram_ack then
+				vram_sel64_bga <= '1';
+			end if;
+			
+		when VMC_SP1_RD1 =>		-- SPRITE ENGINE PART 1
+			if vram_req_reg = vram_ack then
+				vram_sel64_sp1 <= '1';
+				vram_a64_sp1 <= vram_a_reg;
+			end if;
+
+		when VMC_SP2_RD1 =>		-- SPRITE ENGINE PART 2
+			if vram_req_reg = vram_ack then
+				vram_sel64_sp2 <= '1';
+				vram_a64_sp2 <= vram_a_reg;
+			end if;
+	
+		when VMC_DT_ACC1 =>		-- DATA TRANSFER
+			if vram_req_reg = vram_ack then
+			end if;
+		
+		when others => null;
+		end case;
+	end if;
+end process;
+		
+		
 bgb_ci : entity work.vdp_colinfo
 port map(
 	address_a	=> BGB_COLINFO_ADDR_A,
